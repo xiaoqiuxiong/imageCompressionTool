@@ -1,0 +1,289 @@
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>Canvas多图压缩工具</title>
+    <style>
+        *{
+    		padding: 0;
+    		margin: 0;
+    		background-color: #000;
+    		color: #DC143C;
+    		-webkit-touch-callout: none;
+					-webkit-user-select: none;
+					-khtml-user-select: none;
+					-moz-user-select: none;
+					user-select: none;
+    	}
+      html,body{
+    		overflow: hidden;
+    		padding: 20px;
+    		box-sizing: border-box;
+    	}
+    	h3{
+    		text-align: center;
+    	}
+      #compressBox{
+    		display: none;
+    	}
+    	#canvas{
+    		position: fixed;
+    		top: -100000px;
+    		left: -100000px;
+    		opacity: 0;
+    	}
+    	.cont{
+    		margin-top: 20px;
+    		padding: 20px;
+    		box-sizing: border-box;
+    		border: 1px solid #DC143C;
+    		border-radius: 10px;
+    		background-color: #fff;
+    		font-size: 13px;
+    		min-height: 80px;
+    	}
+    	.uploadBtn{
+				position: relative;
+				display: inline-block;
+				padding: 0 20px;
+				line-height: 28px;
+				background-color: #fff;
+				border: 1px solid #DC143C;
+				font-size: 12px;
+				border-radius: 30px;
+				text-align: center;
+				cursor: pointer;
+				width: 300px;
+    	}
+    	.uploadBtn input{
+    		opacity: 0;
+    		position: absolute;
+    		top: 0;
+    		left: 0;
+    		width: 100%;
+    		height: 100%;
+    		cursor: pointer;
+    	}
+    	#selectView{
+    		background-color: #fff;
+    	}
+    	#selectView li{
+    		background-color: #fff;
+    		display: inline-block;
+    		margin-right: 10px;
+    	}
+    	#compressBox{
+    		height: 60px;
+    		background-color: #fff;
+    	}
+    	#active{
+    		position: absolute;
+				left: 50%;
+				transform: translateX(-50%);
+				display: block;
+				padding: 0 20px;
+				line-height: 28px;
+				background-color: #DC143C;
+				border: 1px solid #DC143C;
+				font-size: 12px;
+				border-radius: 30px;
+				text-align: center;
+				cursor: pointer;
+				width: 300px;
+				color: #fff;
+    	}
+    	#show{
+    		display: none;
+    		background-color: #fff;
+    	}
+    	.help{
+    		position: fixed;
+    		font-size: 12px;
+    		bottom: 20px;
+    		left: 0;
+    		text-align: center;	
+    		width: 100%;
+    	}
+    	.selectbox{
+    		background-color: #fff;
+    		display: -webkit-flex;
+    		display: -moz-flex;
+    		display: -ms-flex;
+    		display: -o-flex;
+    		display: flex;
+    	}
+    	.selectbox input,.selectbox div,.selectbox select{
+    		background-color: #fff;
+    	}
+    	.selectbox div{
+    		padding-right: 20px;
+    	}
+    </style>
+</head>
+
+<body>
+    <h3>Canvas多图压缩工具</h3>
+    <div class="cont">
+        <div class="uploadBtn">选择图片<input name="file" accept="image/png, image/jpeg" multiple type="file" id="file"></div>
+        <br>
+        <br>
+        <div class="selectbox">
+            <div>请选择压缩质量</div>
+            <select id="encoderOptions">
+                <option value="0.1">10%</option>
+                <option value="0.2">20%</option>
+                <option value="0.3">30%</option>
+                <option value="0.4">40%</option>
+                <option value="0.5" selected>50%</option>
+                <option value="0.6">60%</option>
+                <option value="0.7">70%</option>
+                <option value="0.8">80%</option>
+                <option value="0.9">90%</option>
+                <option value="1">100%</option>
+            </select>
+        </div>
+        <br>
+        <div id="show">
+            <br>
+            <br>
+            需要压缩的图片:
+            <br>
+            <br>
+            <ul id="selectView"></ul>
+            <br>
+        </div>
+        <div id="compressBox">
+            <button id="active" onclick="startCompress()">压缩图片并下载</button>
+        </div>
+    </div>
+    <canvas id="canvas"></canvas>
+    <div class="help">
+        技术支持
+        <br>
+        作者： 肖秋雄
+        <br>
+        微信： 563995050
+        <br>
+        email: 563995050@qq.com
+    </div>
+    
+    <!-- 网页端压缩解压缩插件JSZIP库 -->
+    <script src="jszip.min.js"></script>
+    <!-- 文件保存到本地库 -->
+    <script src="FileSaver.js"></script>
+    <!--用于文件下载-->
+    <script>
+    // 图片质量(0-1)
+    var encoderOptions = 0.5;
+    // 获取input
+    var filesInput = document.querySelector('#file')
+    // 获取压缩按钮
+    var compressBox = document.querySelector('#compressBox')
+    // 选择图片展示视口
+    var selectView = document.querySelector('#selectView')
+    // 获取选择图片后展示的视口
+    var show = document.querySelector('#show')
+    var encoderOptionInput = document.querySelector('#encoderOptions')
+    // 所有的选择文件
+    var files;
+    var canvas;
+    var ctx;
+    // new JSZip对象
+    var zip = new JSZip();
+    // 创建images文件夹，用来存在压缩完成的图片
+    var imgFolder = zip.folder("images");
+    // 监听input选择文件的变化
+    filesInput.onchange = function() {
+        // 获取所有file
+        files = filesInput.files
+        // 如果选择files数量大于0就显示压缩操作
+        if (files.length > 0) {
+            show.style.display = 'block'
+            compressBox.style.display = 'block'
+        }
+        // 拼接缩略图列表
+        var html = ''
+        for (var i = 0; i < files.length; i++) {
+            html += '<li><img width="60" height="60" src="' + getObjectURL(files[i]) + '" alt="" /></li>'
+        }
+        // 插入拼接的图片列表
+        selectView.innerHTML = html
+    }
+    // 压缩图片的方法
+    function startCompress() {
+        demo(files[0], 0)
+    }
+    // 利用递归循环files
+    function demo(file, num) {
+
+        if (num <= files.length - 1) {
+            encoderOptions = parseFloat(encoderOptionInput.value)
+            // 获取file的base64地址
+            var imgsrc = getObjectURL(file)
+            // 获取文件名称
+            var name = file.name
+            // 监听如果转换base64地址成功，就执行下面的
+            if (imgsrc) {
+                // 创建image,并动态复制src
+                var img = new Image()
+                img.src = imgsrc
+                // 监听img图片加载完成
+                img.onload = () => {
+                    // 获取canvas标签
+                    canvas = document.querySelector('#canvas')
+                    // 获取上下文
+                    ctx = canvas.getContext('2d')
+                    // 根据图片宽高设置canvas的宽高
+                    canvas.width = img.width
+                    canvas.height = img.height
+                    // 在canvas上面画图片
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    // 把canvas转成路径
+                    // canvas.toDataURL(type, encoderOptions);
+                    // 参数
+                    // type 可选
+                    // 图片格式， 默认为image / png
+                    // encoderOptions 可选
+                    // 图片质量。 取值范围为0到1。 如果指定图片格式为image / jpeg或image / webp。 如果超出取值范围， 将会使用默认值0 .92。 其他参数会被忽略。
+                    var typeTxt = 'image/jpeg'
+                    if (name.indexOf('png') != -1) {
+                        typeTxt = 'image/png'
+                    }
+                    var imgdata = canvas.toDataURL(typeTxt, encoderOptions)
+                    // 分割base64
+                    imgdata = imgdata.split(',')
+                    // 添加图片到文件夹
+                    imgFolder.file(name, imgdata[1], { base64: true });
+                    // 如果当前的标记和文件的数量相等的话，就说明压缩添加到文件到文件夹已经完成了，可以压缩下载了。
+                    if (num == files.length - 1) {
+                        zip.generateAsync({ type: "blob" })
+                            .then(function(content) {
+                                // 创建的zip的文件名称是images
+                                saveAs(content, "images.zip");
+                                location.reload()
+                            });
+                    } else {
+                        // 如果没有到标记，就继续回调
+                        num++
+                        demo(files[num], num)
+                    }
+                }
+            }
+        }
+    }
+    // 获取file 的base64路径
+    function getObjectURL(file) {
+        var url = null;
+        if (window.createObjectURL != undefined) {
+            url = window.createObjectURL(file);
+        } else if (window.URL != undefined) { // mozilla(firefox)  
+            url = window.URL.createObjectURL(file);
+        } else if (window.webkitURL != undefined) { // webkit or chrome  
+            url = window.webkitURL.createObjectURL(file);
+        }
+        return url;
+    }
+    </script>
+</body>
+
+</html>
